@@ -1,0 +1,20 @@
+{
+  "name": "hq-layout",
+  "version": "0.1.0",
+  "description": "Turns Claude into a headquarters: a deep-teal ink-wash look, a week strip above the prompt, and an HQ pane with a feed, today's plan, needs-you, metrics and workflows.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "timeZone": {
+      "type": "string",
+      "title": "Clock time zone",
+      "description": "IANA zone for the HQ clock and week strip, such as America/Chicago. Blank uses the machine's zone.",
+      "default": ""
+    },
+    "openOnStart": {
+      "type": "boolean",
+      "title": "Open HQ on start",
+      "description": "Open the HQ pane when a session starts.",
+      "default": true
+    }
+  }
+}

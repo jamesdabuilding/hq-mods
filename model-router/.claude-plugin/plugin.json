@@ -1,0 +1,30 @@
+{
+  "name": "model-router",
+  "version": "0.1.0",
+  "description": "Saves credits by reading each task and picking the lightest model that will do it well, for subagents and, when switching is cheap, the main conversation. Cache-aware, so it never trades a cheap model for an expensive cache rebuild.",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "mode": {
+      "type": "string",
+      "title": "Routing mode",
+      "description": "conservative: route subagents only. balanced (default): also run light questions on Sonnet when switching is cheap. aggressive: also run standard work on Sonnet and light questions on Haiku. off: route nothing.",
+      "default": "balanced",
+      "options": ["off", "conservative", "balanced", "aggressive"]
+    },
+    "switchBudgetTokens": {
+      "type": "number",
+      "title": "Cheap-switch context limit",
+      "description": "Only move the main conversation to a lighter model while its context is under this many tokens, or its prompt cache has gone cold anyway. Above it, re-caching costs more than the lighter model saves.",
+      "default": 40000,
+      "min": 0
+    },
+    "cacheTtlMinutes": {
+      "type": "number",
+      "title": "Prompt cache lifetime (minutes)",
+      "description": "60 on a Claude subscription; 5 on API keys unless you set promptCacheTtl to 1h.",
+      "default": 60,
+      "min": 1
+    }
+  }
+}

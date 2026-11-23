@@ -1,0 +1,15 @@
+{
+  "name": "agent-deck",
+  "version": "0.1.0",
+  "description": "Shows what every subagent is working on right now, with a live progress bar per agent and for the whole batch.",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "openOnSpawn": {
+      "type": "boolean",
+      "title": "Open the Agents pane when an agent starts",
+      "description": "Open the Agents pane the first time a subagent starts in a session.",
+      "default": true
+    }
+  }
+}
