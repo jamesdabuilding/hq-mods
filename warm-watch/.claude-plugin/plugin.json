@@ -1,0 +1,30 @@
+{
+  "name": "warm-watch",
+  "version": "0.1.0",
+  "description": "Warns you shortly before a conversation's prompt cache goes cold, on your desktop or phone, with one-tap Keep warm buttons that drive cache-tax.",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "warnMinutes": {
+      "type": "number",
+      "title": "Warn this many minutes before cold",
+      "description": "How long before the cache is expected to go cold the notification fires.",
+      "default": 10,
+      "min": 1
+    },
+    "ttlMinutes": {
+      "type": "number",
+      "title": "Prompt cache lifetime (minutes)",
+      "description": "60 on a Claude subscription; 5 on API keys unless promptCacheTtl is 1h.",
+      "default": 60,
+      "min": 2
+    },
+    "minContextTokens": {
+      "type": "number",
+      "title": "Only warn above this context size",
+      "description": "Small conversations are cheap to re-cache, so they get no warning.",
+      "default": 30000,
+      "min": 0
+    }
+  }
+}
