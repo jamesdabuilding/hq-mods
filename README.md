@@ -11,36 +11,37 @@ Three Claude Code mods that turn a session into a headquarters.
 
 ## Install
 
-At the prompt of a terminal session:
-
-```
-/plugin install hq-layout --marketplace jamesdabuilding/hq-mods
-/plugin install agent-deck --marketplace jamesdabuilding/hq-mods
-/plugin install model-router --marketplace jamesdabuilding/hq-mods
-/plugin install warm-watch --marketplace jamesdabuilding/hq-mods
-```
-
-From a shell:
+Add the marketplace once, then install the mods you want. In a terminal (PowerShell works):
 
 ```bash
-claude plugin install hq-layout --marketplace jamesdabuilding/hq-mods
+claude plugin marketplace add jamesdabuilding/hq-mods
 ```
 
 ```bash
-claude plugin install agent-deck --marketplace jamesdabuilding/hq-mods
+claude plugin install hq-layout@hq-mods
 ```
 
 ```bash
-claude plugin install model-router --marketplace jamesdabuilding/hq-mods
+claude plugin install agent-deck@hq-mods
 ```
 
 ```bash
-claude plugin install warm-watch --marketplace jamesdabuilding/hq-mods
+claude plugin install model-router@hq-mods
 ```
 
-In the desktop app: click + next to the prompt box, then Plugins, Add marketplace with `jamesdabuilding/hq-mods`, then Add plugin.
+```bash
+claude plugin install warm-watch@hq-mods
+```
 
-This repository is private: installing needs a machine whose git can already read it (an SSH key, or `gh auth login` then `gh auth setup-git`).
+Sessions already open pick them up with `/reload-plugins`. In the desktop app: click + next to the prompt box, then Plugins, Add marketplace with `jamesdabuilding/hq-mods`, then Add plugin.
+
+This repository is private: adding the marketplace needs git signed in to GitHub on that machine (on Windows, Git Credential Manager opens a browser sign-in the first time).
+
+warm-watch's Keep warm buttons need cache-tax. If installing cache-tax fails with "Host key verification failed", git is trying SSH; make it use HTTPS for GitHub, then install again:
+
+```bash
+git config --global url."https://github.com/".insteadOf "git@github.com:"
+```
 
 ## Notes
 
