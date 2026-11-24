@@ -7,7 +7,7 @@ Three Claude Code mods that turn a session into a headquarters.
 | **hq-layout** | A deep-teal ink-wash look with an animated backdrop, a week strip above the prompt, and the HQ pane: a feed of what was built, today's plan, *Needs you*, **Sessions** (brief, reply to and stop your other Claude sessions), metrics and workflows. `/hq` |
 | **agent-deck** | What every subagent is doing right now, with a live progress bar per agent and for the batch. `/deck` |
 | **model-router** | Reads each task and picks the lightest model that will do it well: Haiku for search agents, Sonnet for build agents and quick questions, your model for hard work. Cache-aware, so it never trades a cheaper model for an expensive cache rebuild. `/route` |
-| **warm-watch** | A notification on your desktop or phone shortly before a conversation's cache goes cold, and Keep warm buttons above the prompt (needs cache-tax). `/warm` |
+| **warm-watch** | Keeps chats warm through cache-tax: a cold send shows its price without asking, each chat stays warm for 24h after its last message, and a desktop or phone notification comes before one cools anyway, with Keep warm buttons. `/warm` |
 
 ## Install
 
@@ -35,9 +35,13 @@ claude plugin install warm-watch@hq-mods
 
 Sessions already open pick them up with `/reload-plugins`. In the desktop app: click + next to the prompt box, then Plugins, Add marketplace with `jamesdabuilding/hq-mods`, then Add plugin.
 
-This repository is private: adding the marketplace needs git signed in to GitHub on that machine (on Windows, Git Credential Manager opens a browser sign-in the first time).
+warm-watch needs cache-tax. Install cache-tax with a spending limit of one cold rebuild, so pings never cost more than going cold would:
 
-warm-watch's Keep warm buttons need cache-tax. If installing cache-tax fails with "Host key verification failed", git is trying SSH; make it use HTTPS for GitHub, then install again:
+```bash
+claude plugin install cache-tax@claude-code-mods --config pingFloor=1
+```
+
+ If installing cache-tax fails with "Host key verification failed", git is trying SSH; make it use HTTPS for GitHub, then install again:
 
 ```bash
 git config --global url."https://github.com/".insteadOf "git@github.com:"

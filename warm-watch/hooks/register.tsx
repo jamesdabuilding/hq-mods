@@ -9,8 +9,18 @@ const tokens = atom({ plugin: 'warm-watch', key: 'tokens' } as const, 0)
 const alertedFor = atom({ plugin: 'warm-watch', key: 'alertedFor' } as const, 0)
 const now = atom({ plugin: 'warm-watch', key: 'now' } as const, 0)
 const surface = atom({ plugin: 'warm-watch', key: 'surface' } as const, '')
+const isApplied = atom({ plugin: 'warm-watch', key: 'isApplied' } as const, false)
 
-type CacheTaxStatus = { keepwarm: 'on' | 'stopped' | 'off'; leftMs: number; cold: boolean | null }
+type CacheTaxStatus = {
+  keepwarm: 'on' | 'stopped' | 'off'
+  leftMs: number
+  cold: boolean | null
+  always?: boolean
+  alwaysMs?: number | null
+  guard?: 'refuse' | 'warn'
+}
+
+const WINDOWS: Record<string, number> = { '6h': 6, '12h': 12, '24h': 24, '48h': 48, '72h': 72, '168h': 168 }
 
 /** cache-tax's read-only status, where cache-tax is installed. */
 async function cacheTax($: EngineInterface): Promise<CacheTaxStatus | null> {
@@ -19,6 +29,43 @@ async function cacheTax($: EngineInterface): Promise<CacheTaxStatus | null> {
     return await ($ as unknown as { cacheTax: { status: () => Promise<CacheTaxStatus> } }).cacheTax.status()
   } catch {
     return null
+  }
+}
+
+/**
+ * Applies the person's cache policy through cache-tax's own commands, once a
+ * session starts: a cold send only shows its price, and chats stay warm for the
+ * chosen time after their last turn. Runs a command only where cache-tax's
+ * setting differs, so a session that already matches changes nothing.
+ */
+async function applyPolicy($: EngineInterface, coldSend: string, keepFor: string): Promise<void> {
+  if (await read($, isApplied)) {
+    return
+  }
+
+  const ct = await cacheTax($)
+
+  if (ct === null) {
+    return
+  }
+
+  await update($, isApplied, () => true)
+  const done: string[] = []
+
+  if (coldSend === 'warn' && ct.guard !== undefined && ct.guard !== 'warn') {
+    await $.command.run({ command: 'cache-tax', args: 'guard warn' })
+    done.push('cold sends show their price without asking')
+  }
+
+  const hours = WINDOWS[keepFor]
+
+  if (hours !== undefined && (ct.always !== true || ct.alwaysMs !== hours * 3600000)) {
+    await $.command.run({ command: 'keepwarm', args: `always ${keepFor}` })
+    done.push(`chats stay warm for ${keepFor} after your last message`)
+  }
+
+  if (done.length > 0) {
+    $.ui.toast(`warm-watch: ${done.join('; ')}.`, { timeoutMs: 8000 })
   }
 }
 
@@ -97,6 +144,8 @@ export const register: Register = (on, options) => {
   const ttlMs = (typeof options.ttlMinutes === 'number' ? options.ttlMinutes : 60) * 60000
   const warnMs = Math.min(ttlMs - 60000, (typeof options.warnMinutes === 'number' ? options.warnMinutes : 10) * 60000)
   const minTokens = typeof options.minContextTokens === 'number' ? options.minContextTokens : 30000
+  const coldSend = options.coldSend === 'ask' ? 'ask' : 'warn'
+  const keepFor = typeof options.keepWarmFor === 'string' ? options.keepWarmFor : '24h'
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
@@ -104,8 +153,19 @@ export const register: Register = (on, options) => {
     await update($, surface, () => where)
     await $.command.register({ name: 'warm', description: 'When this conversation’s cache goes cold, and keep it warm' })
     $.clock.every(30000, () => check($, ttlMs, warnMs, minTokens))
+    // After cache-tax has read its own settings for the session.
+    $.clock.after(3000, () => applyPolicy($, coldSend, keepFor))
 
     return started
+  })
+
+  // A backstop for the timer: apply the policy as the first turn starts.
+  on('turn.start', async ($, e, next) => {
+    if (e.agentId === undefined) {
+      await applyPolicy($, coldSend, keepFor)
+    }
+
+    return next(e)
   })
 
   // The main conversation's requests are what keep its cache alive.

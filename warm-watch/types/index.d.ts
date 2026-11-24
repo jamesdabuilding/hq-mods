@@ -12,6 +12,8 @@ declare module 'claude-code' {
       alertedFor: number
       now: number
       surface: string
+      /** Whether the cache policy was applied to cache-tax this session. */
+      isApplied: boolean
     }
   }
 }

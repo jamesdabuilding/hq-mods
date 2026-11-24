@@ -24,9 +24,9 @@ test('warns before the cache cools and keeps it warm through cache-tax', async (
     return { text: 'Keeping warm for 90m.' }
   })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
-  on('turn.step', async function* () {
+  on('turn.step', (async function* () {
     return { turnId: 't1', index: 0, answer: 'ok', toolUses: [], stopReason: 'end_turn' as const, usage: USAGE }
-  })
+  }) as never)
   on('turn.complete', () => ({ text: 'ok' }))
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })

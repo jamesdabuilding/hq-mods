@@ -1,7 +1,7 @@
 {
   "name": "warm-watch",
-  "version": "0.1.0",
-  "description": "Warns you shortly before a conversation's prompt cache goes cold, on your desktop or phone, with one-tap Keep warm buttons that drive cache-tax.",
+  "version": "0.2.0",
+  "description": "Keeps your chats warm and tells you before one goes cold: sets cache-tax to show a cold send's price without asking, keeps chats warm for a day after their last message, and notifies you if one is about to cool anyway.",
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
@@ -25,6 +25,31 @@
       "description": "Small conversations are cheap to re-cache, so they get no warning.",
       "default": 30000,
       "min": 0
+    },
+    "coldSend": {
+      "type": "string",
+      "title": "Cold sends",
+      "description": "warn (default): a send into a cold cache goes through with its price shown. ask: cache-tax asks Send or Don't send first.",
+      "default": "warn",
+      "options": [
+        "warn",
+        "ask"
+      ]
+    },
+    "keepWarmFor": {
+      "type": "string",
+      "title": "Keep chats warm for",
+      "description": "How long cache-tax keeps each chat warm after its last message (its /keepwarm always window). Pings cost a cache read each, about every 50 minutes. off leaves cache-tax as you set it.",
+      "default": "24h",
+      "options": [
+        "off",
+        "6h",
+        "12h",
+        "24h",
+        "48h",
+        "72h",
+        "168h"
+      ]
     }
   }
 }
