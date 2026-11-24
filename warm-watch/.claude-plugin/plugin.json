@@ -1,7 +1,7 @@
 {
   "name": "warm-watch",
-  "version": "0.2.0",
-  "description": "Keeps your chats warm and tells you before one goes cold: sets cache-tax to show a cold send's price without asking, keeps chats warm for a day after their last message, and notifies you if one is about to cool anyway.",
+  "version": "0.3.0",
+  "description": "Tells you before a chat's prompt cache goes cold, on your desktop or phone, with Keep warm and Compact now buttons, and can compact big idle chats while they are still warm so a rebuild costs a fraction.",
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
@@ -26,30 +26,24 @@
       "default": 30000,
       "min": 0
     },
-    "coldSend": {
+    "compactWhenIdle": {
       "type": "string",
-      "title": "Cold sends",
-      "description": "warn (default): a send into a cold cache goes through with its price shown. ask: cache-tax asks Send or Don't send first.",
-      "default": "warn",
-      "options": [
-        "warn",
-        "ask"
-      ]
-    },
-    "keepWarmFor": {
-      "type": "string",
-      "title": "Keep chats warm for",
-      "description": "How long cache-tax keeps each chat warm after its last message (its /keepwarm always window). Pings cost a cache read each, about every 50 minutes. off leaves cache-tax as you set it.",
-      "default": "24h",
+      "title": "Compact big chats when idle",
+      "description": "Compact a chat above the size below after it has been idle this long, while its cache is still warm: the next rebuild then writes only the short summary. off by default, since a summary keeps the plan and decisions, not every detail.",
+      "default": "off",
       "options": [
         "off",
-        "6h",
-        "12h",
-        "24h",
-        "48h",
-        "72h",
-        "168h"
+        "20m",
+        "30m",
+        "45m"
       ]
+    },
+    "compactAbove": {
+      "type": "number",
+      "title": "Compact chats above (tokens)",
+      "description": "Only chats at least this big are compacted when idle.",
+      "default": 150000,
+      "min": 20000
     }
   }
 }

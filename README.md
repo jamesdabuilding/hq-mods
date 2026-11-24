@@ -7,7 +7,7 @@ Three Claude Code mods that turn a session into a headquarters.
 | **hq-layout** | A deep-teal ink-wash look with an animated backdrop, a week strip above the prompt, and the HQ pane: a feed of what was built, today's plan, *Needs you*, **Sessions** (brief, reply to and stop your other Claude sessions), metrics and workflows. `/hq` |
 | **agent-deck** | What every subagent is doing right now, with a live progress bar per agent and for the batch. `/deck` |
 | **model-router** | Reads each task and picks the lightest model that will do it well: Haiku for search agents, Sonnet for build agents and quick questions, your model for hard work. Cache-aware, so it never trades a cheaper model for an expensive cache rebuild. `/route` |
-| **warm-watch** | Keeps chats warm through cache-tax: a cold send shows its price without asking, each chat stays warm for 24h after its last message, and a desktop or phone notification comes before one cools anyway, with Keep warm buttons. `/warm` |
+| **warm-watch** | A desktop or phone notification before a chat's cache goes cold, with Keep warm and Compact now buttons, and optional compaction of big idle chats while they are still warm, so a rebuild costs a fraction. `/warm` |
 
 ## Install
 
@@ -35,11 +35,7 @@ claude plugin install warm-watch@hq-mods
 
 Sessions already open pick them up with `/reload-plugins`. In the desktop app: click + next to the prompt box, then Plugins, Add marketplace with `jamesdabuilding/hq-mods`, then Add plugin.
 
-warm-watch needs cache-tax. Install cache-tax with a spending limit of one cold rebuild, so pings never cost more than going cold would:
-
-```bash
-claude plugin install cache-tax@claude-code-mods --config pingFloor=1
-```
+warm-watch's Keep warm buttons need cache-tax. Its README has the three commands that set cache-tax to keep chats warm for a day and show a cold send's price without asking.
 
  If installing cache-tax fails with "Host key verification failed", git is trying SSH; make it use HTTPS for GitHub, then install again:
 

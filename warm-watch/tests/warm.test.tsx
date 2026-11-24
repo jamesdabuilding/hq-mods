@@ -60,3 +60,43 @@ test('warns before the cache cools and keeps it warm through cache-tax', async (
   expect(commands).toEqual([])
 
 })
+
+const BIG = { input_tokens: 2000, output_tokens: 900, cache_read_input_tokens: 420000, cache_creation_input_tokens: 5000 }
+
+test('a big idle chat is compacted while still warm, and Compact now compacts', { options: { compactWhenIdle: '30m' } }, async ($, on) => {
+  const clock = mock.clock(on, { now: 2_000_000_000 })
+  let compactions = 0
+  on('command.register', () => ({ value: { command: 'warm' } }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.cancelNotify', () => ({ value: { isSent: true } }))
+  on('ui.notify', () => ({ value: { isSent: true, channel: 'client' } }))
+  on('session.compact', () => {
+    compactions += 1
+    return { skip: 'test stands in for the engine' } as never
+  })
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.step', (async function* () {
+    return { turnId: 't1', index: 0, answer: 'ok', toolUses: [], stopReason: 'end_turn' as const, usage: BIG }
+  }) as never)
+  on('turn.complete', () => ({ text: 'ok' }))
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  for await (const _ of $.turn.step({ turnId: 't1', index: 0, model: 'claude-opus-5-5', messageCount: 200 })) {
+    // the step's chunks
+  }
+
+  await clock.advance(20 * 60000)
+  expect(compactions).toBe(0)
+  await clock.advance(11 * 60000)
+  expect(compactions).toBe(1)
+  // Once per idle stretch.
+  await clock.advance(5 * 60000)
+  expect(compactions).toBe(1)
+
+  // Near cold, the row offers Compact now.
+  await clock.advance(16 * 60000)
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  await ui.press({ key: 'warm-compact' })
+  expect(compactions).toBe(2)
+  await ui.unmount()
+})

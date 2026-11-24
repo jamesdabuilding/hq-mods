@@ -9,7 +9,11 @@ const tokens = atom({ plugin: 'warm-watch', key: 'tokens' } as const, 0)
 const alertedFor = atom({ plugin: 'warm-watch', key: 'alertedFor' } as const, 0)
 const now = atom({ plugin: 'warm-watch', key: 'now' } as const, 0)
 const surface = atom({ plugin: 'warm-watch', key: 'surface' } as const, '')
-const isApplied = atom({ plugin: 'warm-watch', key: 'isApplied' } as const, false)
+const compactedFor = atom({ plugin: 'warm-watch', key: 'compactedFor' } as const, 0)
+
+const KEEP = 'Keep the goal, the decisions made and why, open tasks, file paths touched, and the exact next step.'
+
+type Cfg = { ttlMs: number; warnMs: number; minTokens: number; compactIdleMs: number; compactAbove: number }
 
 type CacheTaxStatus = {
   keepwarm: 'on' | 'stopped' | 'off'
@@ -20,7 +24,6 @@ type CacheTaxStatus = {
   guard?: 'refuse' | 'warn'
 }
 
-const WINDOWS: Record<string, number> = { '6h': 6, '12h': 12, '24h': 24, '48h': 48, '72h': 72, '168h': 168 }
 
 /** cache-tax's read-only status, where cache-tax is installed. */
 async function cacheTax($: EngineInterface): Promise<CacheTaxStatus | null> {
@@ -32,41 +35,24 @@ async function cacheTax($: EngineInterface): Promise<CacheTaxStatus | null> {
   }
 }
 
-/**
- * Applies the person's cache policy through cache-tax's own commands, once a
- * session starts: a cold send only shows its price, and chats stay warm for the
- * chosen time after their last turn. Runs a command only where cache-tax's
- * setting differs, so a session that already matches changes nothing.
- */
-async function applyPolicy($: EngineInterface, coldSend: string, keepFor: string): Promise<void> {
-  if (await read($, isApplied)) {
-    return
-  }
-
-  const ct = await cacheTax($)
-
+/** Whether cache-tax is set up to keep chats warm, and the command that fixes it if not. */
+function policyLine(ct: CacheTaxStatus | null): string {
   if (ct === null) {
-    return
+    return 'cache-tax is not installed.'
   }
 
-  await update($, isApplied, () => true)
-  const done: string[] = []
+  const fixes: string[] = []
 
-  if (coldSend === 'warn' && ct.guard !== undefined && ct.guard !== 'warn') {
-    await $.command.run({ command: 'cache-tax', args: 'guard warn' })
-    done.push('cold sends show their price without asking')
+  if (ct.guard !== undefined && ct.guard !== 'warn') {
+    fixes.push('/cache-tax guard warn')
+  }
+  if (ct.always !== true) {
+    fixes.push('/keepwarm always 24h')
   }
 
-  const hours = WINDOWS[keepFor]
+  const now = `cache-tax: cold sends ${ct.guard === 'warn' ? 'show their price' : 'ask first'}; keep warm ${ct.always === true ? `${Math.round((ct.alwaysMs ?? 0) / 3600000)}h after each turn` : `${ct.keepwarm}`}.`
 
-  if (hours !== undefined && (ct.always !== true || ct.alwaysMs !== hours * 3600000)) {
-    await $.command.run({ command: 'keepwarm', args: `always ${keepFor}` })
-    done.push(`chats stay warm for ${keepFor} after your last message`)
-  }
-
-  if (done.length > 0) {
-    $.ui.toast(`warm-watch: ${done.join('; ')}.`, { timeoutMs: 8000 })
-  }
+  return fixes.length === 0 ? now : `${now} To keep chats warm, run ${fixes.join(' and ')} once on this machine.`
 }
 
 function kTokens(n: number): string {
@@ -94,7 +80,33 @@ async function book($: EngineInterface, at: number, size: number, warnMs: number
 }
 
 /** Runs every half minute: raises the warning in-session when its moment comes. */
-async function check($: EngineInterface, ttlMs: number, warnMs: number, minTokens: number): Promise<void> {
+/**
+ * Compacts the conversation now, between turns. While the cache is still warm
+ * this reads the long context at the cache-read price, so the next cold
+ * rebuild only has the short summary to write.
+ */
+async function compactNow($: EngineInterface, why: string): Promise<void> {
+  const last = await read($, lastAt)
+  await update($, compactedFor, () => last)
+
+  try {
+    const r = await $.session.compact({ instructions: KEEP })
+
+    if ('skip' in r && typeof r.skip === 'string') {
+      $.ui.toast(`warm-watch: compaction skipped: ${r.skip}`, { timeoutMs: 8000 })
+      return
+    }
+
+    await update($, alertedFor, () => last)
+    await $.ui.cancelNotify(KEY).catch(() => undefined)
+    $.ui.toast(`warm-watch: ${why}: compacted while the cache was warm, so the next rebuild is small.`, { timeoutMs: 8000 })
+  } catch (error) {
+    $.ui.toast(`warm-watch: could not compact now (${String(error).slice(0, 120)}). Try /compact.`, { timeoutMs: 8000 })
+  }
+}
+
+async function check($: EngineInterface, cfg: Cfg): Promise<void> {
+  const { ttlMs, warnMs, minTokens, compactIdleMs, compactAbove } = cfg
   const t = await $.clock.now()
   await update($, now, () => t)
 
@@ -102,6 +114,14 @@ async function check($: EngineInterface, ttlMs: number, warnMs: number, minToken
   const size = await read($, tokens)
 
   if (last === 0 || size < minTokens) {
+    return
+  }
+
+  const idle = t - last
+
+  // A big chat idle long enough: compact it while the cache is still warm.
+  if (compactIdleMs > 0 && size >= compactAbove && idle >= compactIdleMs && idle < ttlMs - 60000 && (await read($, compactedFor)) !== last) {
+    await compactNow($, `idle ${Math.round(idle / 60000)} min at ${kTokens(size)} tokens`)
     return
   }
 
@@ -133,39 +153,39 @@ async function check($: EngineInterface, ttlMs: number, warnMs: number, minToken
 }
 
 async function keepWarm($: EngineInterface, window: string): Promise<void> {
-  const r = await $.command.run({ command: 'keepwarm', args: window })
-  await $.ui.cancelNotify(KEY).catch(() => undefined)
-  $.ui.toast(r.text ?? `Keeping warm for ${window}.`, { timeoutMs: 6000 })
   const last = await read($, lastAt)
-  await update($, alertedFor, () => last)
+
+  try {
+    const r = await $.command.run({ command: 'keepwarm', args: window })
+    await $.ui.cancelNotify(KEY).catch(() => undefined)
+    $.ui.toast(r.text ?? `Keeping warm for ${window}.`, { timeoutMs: 6000 })
+    await update($, alertedFor, () => last)
+  } catch {
+    $.ui.toast(`warm-watch: type /keepwarm ${window} to keep this chat warm.`, { timeoutMs: 10000 })
+  }
 }
 
 export const register: Register = (on, options) => {
   const ttlMs = (typeof options.ttlMinutes === 'number' ? options.ttlMinutes : 60) * 60000
   const warnMs = Math.min(ttlMs - 60000, (typeof options.warnMinutes === 'number' ? options.warnMinutes : 10) * 60000)
   const minTokens = typeof options.minContextTokens === 'number' ? options.minContextTokens : 30000
-  const coldSend = options.coldSend === 'ask' ? 'ask' : 'warn'
-  const keepFor = typeof options.keepWarmFor === 'string' ? options.keepWarmFor : '24h'
+  const idleWord = typeof options.compactWhenIdle === 'string' ? options.compactWhenIdle : 'off'
+  const cfg: Cfg = {
+    ttlMs,
+    warnMs,
+    minTokens,
+    compactIdleMs: /^\d+m$/.test(idleWord) ? Number(idleWord.slice(0, -1)) * 60000 : 0,
+    compactAbove: typeof options.compactAbove === 'number' ? options.compactAbove : 150000,
+  }
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     const where = e.surface ?? ''
     await update($, surface, () => where)
     await $.command.register({ name: 'warm', description: 'When this conversation’s cache goes cold, and keep it warm' })
-    $.clock.every(30000, () => check($, ttlMs, warnMs, minTokens))
-    // After cache-tax has read its own settings for the session.
-    $.clock.after(3000, () => applyPolicy($, coldSend, keepFor))
+    $.clock.every(30000, () => check($, cfg))
 
     return started
-  })
-
-  // A backstop for the timer: apply the policy as the first turn starts.
-  on('turn.start', async ($, e, next) => {
-    if (e.agentId === undefined) {
-      await applyPolicy($, coldSend, keepFor)
-    }
-
-    return next(e)
   })
 
   // The main conversation's requests are what keep its cache alive.
@@ -200,9 +220,10 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'warm' }, async ($, e) => {
     const word = e.args.trim()
 
-    if (word !== '') {
-      await keepWarm($, word)
+    if (word === 'compact') {
+      return { text: 'Run /compact now to shrink this chat while its cache is warm; warm-watch\'s Compact now button and the Compact when idle option do the same.' }
     }
+
 
     const last = await read($, lastAt)
     const t = await $.clock.now()
@@ -211,7 +232,7 @@ export const register: Register = (on, options) => {
     const state = last === 0 ? 'No request yet this session.' : left > 0 ? `Warm for about ${left} more min.` : 'Likely cold now.'
     const tax = ct === null ? 'cache-tax is not installed, so Keep warm is unavailable.' : `cache-tax keepwarm: ${ct.keepwarm}${ct.keepwarm === 'on' ? ` (${Math.round(ct.leftMs / 60000)} min left)` : ''}.`
 
-    return { text: `${state} Context ${kTokens(await read($, tokens))} tokens. ${tax} Warns ${Math.round(warnMs / 60000)} min before cold. /warm 90m keeps it warm.` }
+    return { text: `${state} Context ${kTokens(await read($, tokens))} tokens. ${tax} Warns ${Math.round(warnMs / 60000)} min before cold. /keepwarm 90m keeps it warm; /compact while warm makes the next rebuild small. ${policyLine(ct)}` }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -239,6 +260,7 @@ export const register: Register = (on, options) => {
           <Text color="warning">❄</Text> {`Cache goes cold in ${minutes} min`}
           <Text dimColor>{` · ${kTokens(size)} tokens to re-cache`}</Text>
         </Text>
+        <Button key="warm-compact" label="Compact now" onPress={() => compactNow($, 'you asked')} />
         {ct === null ? (
           <Text dimColor>Install cache-tax to keep it warm</Text>
         ) : (

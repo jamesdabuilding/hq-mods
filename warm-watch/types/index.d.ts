@@ -12,8 +12,8 @@ declare module 'claude-code' {
       alertedFor: number
       now: number
       surface: string
-      /** Whether the cache policy was applied to cache-tax this session. */
-      isApplied: boolean
+      /** The lastAt a compaction already ran for. */
+      compactedFor: number
     }
   }
 }
